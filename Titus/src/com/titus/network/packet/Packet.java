@@ -1,8 +1,8 @@
 package com.titus.network.packet;
 
-import com.titus.network.crypto.ISAACCipher;
-
 import io.netty.buffer.ByteBuf;
+
+import com.titus.network.crypto.ISAACCipher;
 
 /**
  * 

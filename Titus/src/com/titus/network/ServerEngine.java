@@ -4,7 +4,6 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -14,7 +13,6 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 
 import java.net.InetSocketAddress;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.titus.network.codecs.RS2ProtocolConnectionDecoder;
@@ -92,8 +90,6 @@ public class ServerEngine implements Runnable {
 		ServerBootstrap bootstrap = new ServerBootstrap();
 		bootstrap.group(bossGroup, workerGroup)
 		.channel(NioServerSocketChannel.class)
-		.option(ChannelOption.SO_BACKLOG, 128)
-		.childOption(ChannelOption.SO_KEEPALIVE, true)
 		.handler(new LoggingHandler(LogLevel.INFO))
 		.childHandler(new ChannelInitializer<SocketChannel>() {
 
@@ -111,8 +107,9 @@ public class ServerEngine implements Runnable {
 		Channel channel = future.channel();
 		channel.closeFuture();
 		future.sync();
-		} catch (InterruptedException e) {
-			logger.log(Level.WARNING, e.getMessage());
+		
+		} catch (Exception e) {
+			
 		}
 		
 	}

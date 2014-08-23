@@ -1,114 +1,125 @@
 package com.titus.network.codecs;
 
-import java.util.List;
-
-import com.titus.game.entity.player.Player;
-import com.titus.network.crypto.ISAACCipher;
-import com.titus.network.packet.Packet;
-import com.titus.utilities.RS2String;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ReplayingDecoder;
 
+import java.util.List;
+
+import com.titus.game.entity.player.Player;
+import com.titus.network.crypto.ISAACCipher;
+import com.titus.utilities.RS2String;
+
 /**
  * 
  * @author Braeden Dempsey
- * @author RandQm
- *
+ * 
  */
 
 public class RS2ProtocolLoginDecoder extends ReplayingDecoder<ByteBuf> {
-
+	
+	private RS2ProtocolLoginState state = RS2ProtocolLoginState.INITIAL_STATE;
 	
 	@Override
 	protected void decode(ChannelHandlerContext context, ByteBuf buffer, List<Object> out) throws Exception {
 		final Channel channel = context.channel();
 		final int connectionType = buffer.readByte();
 		
-		if (connectionType != 16 && connectionType != 18) {
-			channel.close();
+		if (!channel.isRegistered()) {
 			return;
 		}
-		final int blockLength = buffer.readByte() & 0xff;
 		
-		if (buffer.readableBytes() < blockLength) {
-			channel.close();
-			return;
-		}
-		if (buffer.readUnsignedByte() != 0xFF) {
-			channel.close();
-			return;
-		}
-		if (buffer.readShort() != 317) {
-			channel.close();
-			return;
-		}
-		buffer.readUnsignedByte();
+		switch (state) {
+		
+		case INITIAL_STATE:
+			if (!channel.isRegistered())
+				return;
+			state = RS2ProtocolLoginState.CONNECTION_STATE;
+			break;
+		
+		case CONNECTION_STATE:
+			if (buffer.readableBytes() < 2)
+				return;
+			
+			if (connectionType != 14) {
+				System.out.println("[ERROR] Invalid login request. Connection type: " + connectionType + ".");
+				channel.close();
+				return;
+			}
+			state = RS2ProtocolLoginState.LOGGING_IN_STATE;
+			break;
+			
+		case LOGGING_IN_STATE:
+			if (buffer.readableBytes() < 2)
+				return;
+			
+			if (connectionType != 16 && connectionType != 18) {
+				System.out.println("[ERROR] Invalid login request. Connection type: " + connectionType + ".");
+				channel.close();
+				return;
+			}
+			
+			int loginEncryption = buffer.readUnsignedByte() - (36 + 1 + 1 + 2);
+			if (loginEncryption <= 0) {
+				System.out.println("[ERROR] Invalid login encryption request.");
+				channel.close();
+				return;
+			}
+			
+			if (buffer.readUnsignedShort() != 317) {
+				System.out.println("[ERROR] Invalid client version request.");
+				channel.close();
+				return;				
+			}
+			
+			buffer.readByte();
+			
+			for (int i = 0; i < 9; i++)
+				buffer.readInt();
+			
+			buffer.readByte();
+			
+			if (buffer.readByte() != 10) {
+				System.out.println("[ERROR] Unable to decode RSA.");
+				channel.close();
+				return;
+			}
+			
+			long clientHalf = buffer.readLong();
+			long serverHalf = buffer.readLong();
+			int[] isaacSeed = { (int) (clientHalf >> 32), (int) clientHalf, (int) (serverHalf >> 32), (int) serverHalf };
+			ISAACCipher inCipher = new ISAACCipher(isaacSeed);
+			for (int i = 0; i < isaacSeed.length; i++)
+				isaacSeed[i] += 50;
+			ISAACCipher outCipher = new ISAACCipher(isaacSeed);
+			
+			int version = buffer.readInt();
+			
+			final String username = RS2String.formatPlayerName(RS2String.buildRS2String(buffer));
+			final String password = RS2String.buildRS2String(buffer);
+			
 
-		for (int i = 0; i < 9; i ++)
-			buffer.readInt();
-
-		buffer.readUnsignedByte();
-
-		if (buffer.readUnsignedByte() != 10) {
-			channel.close();
-			return;
+			if (!username.matches("[A-Za-z0-9 ]+") || username.length() > 12 || username.length() < 3) {
+				return;
+			}
+			
+			Player player = new Player(context, username, password);
+			player.setEncryption(outCipher);
+			player.setUsername(username);
+			player.setPassword(password);
+			
+			channel.pipeline().replace("rs2-login-decoder", "rs2-decoder", new RS2ProtocolDecoder(player));
+			
+			
+			break;
+	
+		default:
+			break;
+	
 		}
-		final long clientHalf = buffer.readLong();
-		final long serverHalf = buffer.readLong();
 		
-		final int[] isaacSeed = { (int) (clientHalf >> 32), (int) clientHalf, (int) (serverHalf >> 32), (int) serverHalf };
-		final ISAACCipher crypticIn = new ISAACCipher(isaacSeed);
-		
-		for (int i = 0; i < isaacSeed.length; i++)
-			isaacSeed[i] += 50;
-		
-		final ISAACCipher crypticOut = new ISAACCipher(isaacSeed);
-		
-		@SuppressWarnings("unused")
-		final int version = buffer.readInt();
-		
-		final String username = RS2String.formatPlayerName(RS2String.buildRS2String(buffer));
-		final String password = RS2String.buildRS2String(buffer);
-		
-		final int responseCode = getResponseCode(username, password);
-		
-		Packet response = new Packet(context.alloc().buffer());
-		response.getBuffer().writeByte(responseCode);
-		response.getBuffer().writeByte(2); //TODO: rights
-		response.getBuffer().writeByte(0);
-		channel.write(response);
-		
-		if (responseCode != 2) {
-			channel.close();
-			return;
-		}
-		Player player = new Player(context, username, password);
-		
-		player.setDecryption(crypticIn);
-		player.setEncryption(crypticOut);
-		
-		context.pipeline().replace("rs2-login-decoder", "rs2-decoder", new RS2ProtocolDecoder(player));
 	}
 	
-	/**
-	 * Retrieves the response code for the login protocol.
-	 * 
-	 * @param username The username of the connection.
-	 * 
-	 * @param password The password of the connection.
-	 * 
-	 * @return The resulting response code.
-	 */
-	private int getResponseCode(final String username, final String password) {
-		if (!username.matches("[A-Za-z0-9 ]+") 
-				|| username.length() < 3 || username.length() > 12)
-			return 3;
-		
-		// TODO: Check if banned (4), Already logged in (5), World Full (7), Multiple connections from same IP (9).
-		return 2;
-	}
 
 }

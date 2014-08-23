@@ -61,10 +61,32 @@ public class Player extends Entity {
 	}
 	
 	/**
+	 *  Sets the players username.
+	 * @param username
+	 * 		the username being set.
+	 * @return
+	 * 		the players username.
+	 */
+	public String setUsername(String username) {
+		return this.username = username;
+	}
+	
+	/**
 	 * @return the password.
 	 */
 	public String getPassword() {
 		return password;
+	}
+	
+	/**
+	 *  Sets the players password.
+	 * @param username
+	 * 		the password being set.
+	 * @return
+	 * 		the players password.
+	 */
+	public String setPassword(String password) {
+		return this.password = password;
 	}
 	
 	/**

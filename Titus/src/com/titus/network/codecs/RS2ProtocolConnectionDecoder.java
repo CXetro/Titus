@@ -12,7 +12,7 @@ import com.titus.network.packet.Packet;
 
 /**
  * 
- * @author RandQm
+ * @author Braeden Dempsey
  *
  */
 
@@ -25,6 +25,7 @@ public class RS2ProtocolConnectionDecoder extends ReplayingDecoder<ByteBuf> {
 		final int loginRequestType = buffer.readByte();
 
 		if (loginRequestType != 14) {
+			System.out.println("[ERROR] Invalid login request type.");
 			channel.close();
 			return;
 		}
@@ -36,7 +37,7 @@ public class RS2ProtocolConnectionDecoder extends ReplayingDecoder<ByteBuf> {
 		response.getBuffer().writeLong(new SecureRandom().nextLong());
 		channel.write(response);
 
-		context.pipeline().replace("rs2-connection-request-decoder",
+		context.pipeline().replace("rs2-connection-decoder",
 				"rs2-login-decoder", new RS2ProtocolLoginDecoder());
 	}
 
