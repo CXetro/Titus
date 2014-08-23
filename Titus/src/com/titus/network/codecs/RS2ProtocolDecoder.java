@@ -1,5 +1,110 @@
 package com.titus.network.codecs;
 
-public class RS2ProtocolDecoder {
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.ReplayingDecoder;
+
+import java.util.List;
+
+import com.titus.game.entity.player.Player;
+import com.titus.network.packet.Packet;
+import com.titus.network.packet.PacketHandler;
+
+/**
+ * 
+ * @author RandQm
+ *
+ */
+
+public class RS2ProtocolDecoder extends ReplayingDecoder<ByteBuf> {
+
+	/**
+	 * The incoming packet opcode.
+	 */
+	private int opcode = -1;
+
+	/**
+	 * The incoming packet size.
+	 */
+	private int size = -1;
+
+	/**
+	 * The expected packet sizes for the incoming packets.
+	 */
+	private static final int PACKET_SIZES[] = { 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, // 0
+			0, 0, 0, 0, 8, 0, 6, 2, 2, 0, // 10
+			0, 2, 0, 6, 0, 12, 0, 0, 0, 0, // 20
+			0, 0, 0, 0, 0, 8, 4, 0, 0, 2, // 30
+			2, 6, 0, 6, 0, -1, 0, 0, 0, 0, // 40
+			0, 0, 0, 12, 0, 0, 0, 8, 8, 12, // 50
+			8, 8, 0, 0, 0, 0, 0, 0, 0, 0, // 60
+			6, 0, 2, 2, 8, 6, 0, -1, 0, 6, // 70
+			0, 0, 0, 0, 0, 1, 4, 6, 0, 0, // 80
+			0, 0, 0, 0, 0, 3, 0, 0, -1, 0, // 90
+			0, 13, 0, -1, 0, 0, 0, 0, 0, 0,// 100
+			0, 0, 0, 0, 0, 0, 0, 6, 0, 0, // 110
+			1, 0, 6, 0, 0, 0, -1, 0, 2, 6, // 120
+			0, 4, 6, 8, 0, 6, 0, 0, 0, 2, // 130
+			0, 0, 0, 0, 0, 6, 0, 0, 0, 0, // 140
+			0, 0, 1, 2, 0, 2, 6, 0, 0, 0, // 150
+			0, 0, 0, 0, -1, -1, 0, 0, 0, 0,// 160
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 170
+			0, 8, 0, 3, 0, 2, 0, 0, 8, 1, // 180
+			0, 0, 12, 0, 0, 0, 0, 0, 0, 0, // 190
+			2, 0, 0, 0, 0, 0, 0, 0, 4, 0, // 200
+			4, 0, 0, 0, 7, 8, 0, 0, 10, 0, // 210
+			0, 0, 0, 0, 0, 0, -1, 0, 6, 0, // 220
+			1, 0, 0, 0, 6, 0, 6, 8, 1, 0, // 230
+			0, 4, 0, 0, 0, 0, -1, 0, -1, 4,// 240
+			0, 0, 6, 6, 0, 0, 0 // 250
+	};
+
+	/**
+	 * The player.
+	 */
+	private final Player player;
+
+	/**
+	 * The constructor.
+	 * 
+	 * @param player
+	 *            The player.
+	 */
+	public RS2ProtocolDecoder(Player player) {
+		this.player = player;
+	}
+
+	@Override
+	protected void decode(ChannelHandlerContext context, ByteBuf buffer,
+			List<Object> out) throws Exception {
+		if (opcode == -1) {
+			if (buffer.readableBytes() < 1)
+				return;
+
+			opcode = buffer.readByte() & 0xFF;
+			opcode = (opcode - player.getEncryption().getNextValue()) & 0xFF;
+			size = PACKET_SIZES[opcode];
+		}
+		if (size == -1) {
+			if (buffer.readableBytes() < 1)
+				return;
+
+			size = buffer.readByte() & 0xFF;
+		}
+		if (buffer.readableBytes() >= size) {
+			final byte[] data = new byte[size];
+			buffer.readBytes(data);
+			final ByteBuf payload = Unpooled.buffer(size);
+			payload.writeBytes(data);
+			try {
+				PacketHandler.handleReceivedPacket(player, new Packet(opcode,
+						payload));
+			} finally {
+				opcode = -1;
+				size = -1;
+			}
+		}
+	}
 
 }

@@ -72,10 +72,17 @@ public class ServerEngine implements Runnable {
 		try {
 			
 		address = new InetSocketAddress(host, port);
+		logger.info("Starting Titius...");
 		
+		initialize();
+		logger.info("Titus is online!");
+		
+		while (true) {
+			process();
+		}
 			
 		} catch (Exception exception) {
-			
+			exception.printStackTrace();
 		}
 		
 	}
@@ -109,6 +116,17 @@ public class ServerEngine implements Runnable {
 		}
 		
 	}
+	
+	/**
+	 *  Handles all cycled processes.
+	 */
+	private void process() {
+		try {
+			// TODO: Player Updating
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
 
 	/**
 	 *  Creates a public instance of the {@link ServerEngine} singleton.
@@ -125,8 +143,8 @@ public class ServerEngine implements Runnable {
 	 * 		the new singleton.
 	 */
 	public static void setSingleton(ServerEngine singleton) {
-		if (singleton != null)
-			throw new IllegalStateException("[ERROR] Singleton has already been written.");
+		if (singleton == null)
+			throw new IllegalStateException("[ERROR] Singleton has not been written.");
 		ServerEngine.singleton = singleton;
 	}
 

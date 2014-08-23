@@ -1,27 +1,43 @@
 package com.titus.network.codecs;
 
-import io.netty.channel.ChannelHandler;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.ReplayingDecoder;
 
-public class RS2ProtocolConnectionDecoder implements ChannelHandler {
+import java.security.SecureRandom;
+import java.util.List;
+
+import com.titus.network.packet.Packet;
+
+/**
+ * 
+ * @author RandQm
+ *
+ */
+
+public class RS2ProtocolConnectionDecoder extends ReplayingDecoder<ByteBuf> {
 
 	@Override
-	public void exceptionCaught(ChannelHandlerContext arg0, Throwable arg1)
-			throws Exception {
-		// TODO Auto-generated method stub
+	protected void decode(ChannelHandlerContext context, ByteBuf buffer,
+			List<Object> out) throws Exception {
+		final Channel channel = context.channel();
+		final int loginRequestType = buffer.readByte();
 
-	}
+		if (loginRequestType != 14) {
+			channel.close();
+			return;
+		}
+		buffer.readUnsignedByte();
 
-	@Override
-	public void handlerAdded(ChannelHandlerContext arg0) throws Exception {
-		// TODO Auto-generated method stub
+		Packet response = new Packet(context.alloc().buffer());
+		response.getBuffer().writeLong(0);
+		response.getBuffer().writeByte(0);
+		response.getBuffer().writeLong(new SecureRandom().nextLong());
+		channel.write(response);
 
-	}
-
-	@Override
-	public void handlerRemoved(ChannelHandlerContext arg0) throws Exception {
-		// TODO Auto-generated method stub
-
+		context.pipeline().replace("rs2-connection-request-decoder",
+				"rs2-login-decoder", new RS2ProtocolLoginDecoder());
 	}
 
 }

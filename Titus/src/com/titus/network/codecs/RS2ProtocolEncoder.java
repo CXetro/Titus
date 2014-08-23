@@ -1,27 +1,24 @@
 package com.titus.network.codecs;
 
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToMessageEncoder;
 
-public class RS2ProtocolEncoder implements ChannelHandler {
+import java.util.List;
 
-	@Override
-	public void exceptionCaught(ChannelHandlerContext arg0, Throwable arg1)
-			throws Exception {
-		// TODO Auto-generated method stub
+import com.titus.network.packet.Packet;
 
-	}
+/**
+ * 
+ * @author RandQm
+ *
+ */
 
-	@Override
-	public void handlerAdded(ChannelHandlerContext arg0) throws Exception {
-		// TODO Auto-generated method stub
-
-	}
+public class RS2ProtocolEncoder extends MessageToMessageEncoder<Packet> {
 
 	@Override
-	public void handlerRemoved(ChannelHandlerContext arg0) throws Exception {
-		// TODO Auto-generated method stub
-
+	protected void encode(ChannelHandlerContext context, Packet packet,
+			List<Object> out) throws Exception {
+		context.writeAndFlush(packet.getBuffer());
 	}
 
 }
